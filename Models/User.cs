@@ -5,16 +5,22 @@ public class User
 {
     [BsonId]
     [BsonRepresentation(BsonType.ObjectId)]
-    public string Id { get; set; }
+    public required string Id { get; set; }
 
     [BsonElement("userid")]
-    public string UserId { get; set; }
+    public required string UserId { get; set; }
+
+    [BsonElement("firstname")]
+    public required string FirstName { get; set; }
+
+    [BsonElement("lastname")]
+    public required string LastName { get; set; }
 
     [BsonElement("email")]
-    public string Email { get; set; }
+    public required string Email { get; set; }
 
     [BsonElement("password")]
-    public string Password { get; set; }
+    public required string Password { get; set; }
 
     [BsonElement("journalEntryId")]
     public List<string> JournalEntries { get; set; } = new List<string>();

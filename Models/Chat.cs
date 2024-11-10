@@ -5,13 +5,13 @@ public class Chat
 {
     [BsonId]
     [BsonRepresentation(BsonType.ObjectId)]
-    public string Id { get; set; }
+    public required string Id { get; set; }
 
     [BsonElement("chatid")]
-    public string ChatId { get; set; }
+    public required string ChatId { get; set; }
 
     [BsonElement("messages")]
-    public List<Message> Messages { get; set; }
+    public required List<Message> Messages { get; set; }
 }
 
 public class Message
@@ -21,8 +21,8 @@ public class Message
 
     [BsonElement("sender")]
     [BsonRepresentation(BsonType.ObjectId)]
-    public string Sender { get; set; }
+    public required string Sender { get; set; }
 
     [BsonElement("message")]
-    public string Content { get; set; }
+    public required string Content { get; set; }
 }

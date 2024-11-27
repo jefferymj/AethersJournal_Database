@@ -17,11 +17,12 @@ public class Startup
         // Add CORS policy
         services.AddCors(options =>
         {
-            options.AddPolicy("AllowSpecificOrigins", builder =>
+            options.AddPolicy("http://localhost:5015", builder =>
             {
-                builder.WithOrigins("http://localhost:5015", "http://example.com") // Add allowed origins here
+                builder.WithOrigins("http://localhost:5015") // Add allowed origins here
                        .AllowAnyHeader()
-                       .AllowAnyMethod();
+                       .AllowAnyMethod()
+                       .AllowCredentials();
             });
         });
 
@@ -48,7 +49,7 @@ public class Startup
         app.UseRouting();
 
         // Enable CORS
-        app.UseCors("AllowSpecificOrigins");
+        app.UseCors("http://localhost:5015");
 
         app.UseAuthorization();
 

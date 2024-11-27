@@ -1,11 +1,11 @@
-using System.Reflection.Metadata.Ecma335;
 using Microsoft.AspNetCore.Mvc;
 using MongoDB.Bson;
 using MongoDB.Driver;
 
 [ApiController]
 [Route("api/[controller]")]
-public class SessionController : ControllerBase {
+public class SessionController : ControllerBase
+{
     private readonly MongoDBService _mongoDBService;
 
     public SessionController(MongoDBService mongoDBService)
@@ -14,13 +14,30 @@ public class SessionController : ControllerBase {
     }
 
     // Create a new session
-    [HttpPost("addSession")]
-    async public Task<IActionResult> addSession() {
-        var session = new Session {
+    [HttpPost("getUser/useSession")]
+    async public Task<IActionResult> GetUserUseSession()
+    {
+        var session = new Session
+        {
             Id = ObjectId.GenerateNewId().ToString(),
             SessionToken = "Session 1",
             UserId = "",
         };
         return Ok("Session added successfully");
+    }
+
+    [HttpGet("test-cookie")]
+    async public Task<IActionResult> TestCookie()
+    {
+        var cookieOptions = new CookieOptions
+        {
+            Expires = DateTime.UtcNow.AddDays(7),
+            HttpOnly = true, 
+            Secure = false,   
+            SameSite = SameSiteMode.Lax 
+        };
+
+        Response.Cookies.Append("test-cookie", "COOOOKIE", cookieOptions);
+        return Ok("Secure cookie has been set.");
     }
 }

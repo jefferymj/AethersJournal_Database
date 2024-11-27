@@ -14,6 +14,17 @@ public class Startup
         services.Configure<MongoDBSettings>(Configuration.GetSection("MongoDB"));
         services.AddSingleton<MongoDBService>();
 
+        // Add CORS policy
+        services.AddCors(options =>
+        {
+            options.AddPolicy("AllowSpecificOrigins", builder =>
+            {
+                builder.WithOrigins("http://localhost:5015", "http://example.com") // Add allowed origins here
+                       .AllowAnyHeader()
+                       .AllowAnyMethod();
+            });
+        });
+
         // Add controllers
         services.AddControllersWithViews();
     }
@@ -35,6 +46,9 @@ public class Startup
         app.UseStaticFiles();
 
         app.UseRouting();
+
+        // Enable CORS
+        app.UseCors("AllowSpecificOrigins");
 
         app.UseAuthorization();
 

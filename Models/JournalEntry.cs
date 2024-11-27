@@ -5,13 +5,10 @@ public class JournalEntry
 {
     [BsonId]
     [BsonRepresentation(BsonType.ObjectId)]
-    public required string Id { get; set; }
-
-    [BsonElement("journalentryid")]
-    public required string JournalEntryId { get; set; } // Unique ID for each journal entry
+    public string? Id { get; set; }
 
     [BsonElement("userid")]
-    public required string UserId { get; set; } // Associated user ID for this journal entry
+    public string? UserId { get; set; } // Associated user ID for this journal entry
 
     [BsonElement("title")]
     public required string Title { get; set; }
@@ -26,5 +23,12 @@ public class JournalEntry
     public required string Summary { get; set; }
 
     [BsonElement("chatid")]
-    public required string ChatId { get; set; }
+    public string? ChatId { get; set; }
+}
+
+public class JournalEntryRequest
+{
+    public string? Title { get; set; }
+    public string? Content { get; set; }
+    public string? Date { get; set; } // Consider using DateTime if you expect a proper date format
 }

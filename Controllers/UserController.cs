@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using MongoDB.Bson;
 using MongoDB.Driver;
 
 [ApiController]
@@ -14,21 +15,31 @@ public class UserController : ControllerBase
 
     // Create a new user
     [HttpPost("addUser")]
-    public async Task<IActionResult> AddUser([FromBody] User user)
+    public async Task<IActionResult> AddUser([FromBody] UserRequest user)
     {
-        if (ModelState.IsValid)
+        if (user == null || string.IsNullOrEmpty(user.FirstName) || string.IsNullOrEmpty(user.LastName) || string.IsNullOrEmpty(user.Email) || string.IsNullOrEmpty(user.Password))
         {
-            await _mongoDBService.Users.InsertOneAsync(user);
-            return Ok("User added successfully");
+            return BadRequest("All fields are required");
         }
-        return BadRequest(ModelState);
+        
+        User userModel = new User
+        {
+            Id = ObjectId.GenerateNewId().ToString(),
+            FirstName = user.FirstName,
+            LastName = user.LastName,
+            Email = user.Email,
+            Password = user.Password
+        };
+        await _mongoDBService.Users.InsertOneAsync(userModel);
+        return Ok("User added successfully");
+
     }
 
     // Get a user by userid
     [HttpGet("getUser/{userid}")]
     public async Task<IActionResult> GetUser(string userid)
     {
-        var user = await _mongoDBService.Users.Find(u => u.UserId == userid).FirstOrDefaultAsync();
+        var user = await _mongoDBService.Users.Find(u => u.Id == userid).FirstOrDefaultAsync();
         return user != null ? Ok(user) : NotFound("User not found");
     }
 
@@ -37,7 +48,7 @@ public class UserController : ControllerBase
     public async Task<IActionResult> UpdateUser(string userid, [FromBody] User updatedFields)
     {
         // Check if the user exists
-        var existingUser = await _mongoDBService.Users.Find(u => u.UserId == userid).FirstOrDefaultAsync();
+        var existingUser = await _mongoDBService.Users.Find(u => u.Id == userid).FirstOrDefaultAsync();
         if (existingUser == null)
         {
             return NotFound("User not found");
@@ -65,7 +76,7 @@ public class UserController : ControllerBase
         var combinedUpdate = Builders<User>.Update.Combine(updateDefinition);
 
         // Apply the update
-        var result = await _mongoDBService.Users.UpdateOneAsync(u => u.UserId == userid, combinedUpdate);
+        var result = await _mongoDBService.Users.UpdateOneAsync(u => u.Id == userid, combinedUpdate);
 
         return result.ModifiedCount > 0 ? Ok("User updated successfully") : NotFound("Failed to update user");
     }
@@ -80,7 +91,7 @@ public class UserController : ControllerBase
 
         // Delete the user document
         var deleteUserResult = await _mongoDBService.Users
-            .DeleteOneAsync(u => u.UserId == userid);
+            .DeleteOneAsync(u => u.Id == userid);
 
         if (deleteUserResult.DeletedCount > 0)
         {

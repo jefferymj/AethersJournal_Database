@@ -23,7 +23,9 @@ public class JournalEntryController : ControllerBase
         }
 
         // Check if the associated user exists
-        var existingUser = await _mongoDBService.Users.Find(u => u.Id == userid).FirstOrDefaultAsync();
+        var existingUser = await _mongoDBService.Users.Find(u => u._id == userid).FirstOrDefaultAsync();
+
+
         if (existingUser == null)
         {
             // Return an error response if the associated user does not exist
@@ -75,7 +77,7 @@ public class JournalEntryController : ControllerBase
 
             // Update the user's document to add the new journalEntryId
             var addToUserJournalEntries = Builders<User>.Update.AddToSet(u => u.JournalEntries, journalEntry.Id);
-            await _mongoDBService.Users.UpdateOneAsync(u => u.Id == userid, addToUserJournalEntries);
+            await _mongoDBService.Users.UpdateOneAsync(u => u._id == userid, addToUserJournalEntries);
 
             return Ok("Journal entry added successfully");
         }
@@ -84,16 +86,22 @@ public class JournalEntryController : ControllerBase
     // Get journal entry by journalentryid
     [HttpGet("getJournalEntry/{userid}/{date}")]
     public async Task<IActionResult> GetJournalEntry(string userid, string date)
-    {
+    {   
+        var user = _mongoDBService.Users.Find(u => u._id == userid).FirstOrDefault();
+        if (user == null)
+        {
+            return NotFound("User not found");
+        }
+
         // Retrieve the journal entry that matches the specified userid and journalentryid
         var journalEntry = await _mongoDBService.JournalEntries
             .Find(j => j.UserId == userid && j.Date == DateTime.Parse(date))
             .FirstOrDefaultAsync();
-
+        
         if (journalEntry == null)
         {
-            // Return a 404 Not Found response if no matching journal entry is found
-            return NotFound("Journal entry not found or does not belong to this user.");
+            // Return a 200 Ok response if no matching journal entry is found
+            return Ok("There is no journal entry for that date.");
         }
 
         // Return the journal entry data as a JSON object
@@ -169,7 +177,7 @@ public class JournalEntryController : ControllerBase
         {
             // Update the user's document to remove the journalEntryId
             var pullFromUserJournalEntries = Builders<User>.Update.Pull(u => u.JournalEntries, journalentryid);
-            await _mongoDBService.Users.UpdateOneAsync(u => u.Id == userid, pullFromUserJournalEntries);
+            await _mongoDBService.Users.UpdateOneAsync(u => u._id == userid, pullFromUserJournalEntries);
 
             return Ok("Journal entry deleted successfully");
         }

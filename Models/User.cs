@@ -5,17 +5,17 @@ public class User
 {
     [BsonId]
     [BsonRepresentation(BsonType.ObjectId)]
-    public string? _id { get; set; }
-
-    public string? Id
+    public string? _id
     {
-        get => _id;
+        get => _backingId;
         set
         {
-            _id = value;
-            UserId = value; // Automatically set UserId whenever Id is set.
+            _backingId = value;
+            UserId = value;
         }
     }
+
+    private string? _backingId;
 
     [BsonElement("userid")]
     public string? UserId { get; private set; }

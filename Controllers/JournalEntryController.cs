@@ -6,10 +6,12 @@ using MongoDB.Driver;
 public class JournalEntryController : ControllerBase
 {
     private readonly MongoDBService _mongoDBService;
+    private readonly HttpClient _httpClient;
 
     public JournalEntryController(MongoDBService mongoDBService)
     {
         _mongoDBService = mongoDBService;
+        _httpClient = new HttpClient();
     }
 
     // Create a new journal entry
@@ -50,8 +52,12 @@ public class JournalEntryController : ControllerBase
 
             if (!string.IsNullOrEmpty(journalEntryRequest.Content))
                 updateDefinition.Add(Builders<JournalEntry>.Update.Set(j => j.Content, journalEntryRequest.Content));
+            
+            string journalSummary = await GetJournalSummary(journalEntryRequest.Content);
 
-            // update summary now aaaaa
+            if (!string.IsNullOrEmpty(journalSummary))
+                updateDefinition.Add(Builders<JournalEntry>.Update.Set(j => j.Summary, journalSummary));
+            
             var combinedUpdate = Builders<JournalEntry>.Update.Combine(updateDefinition);
 
             var updateResult = await _mongoDBService.JournalEntries.UpdateOneAsync(
@@ -63,13 +69,15 @@ public class JournalEntryController : ControllerBase
         }
         else
         {
+            string journalSummary = await GetJournalSummary(journalEntryRequest.Content);
+
             JournalEntry journalEntry = new JournalEntry
             {
                 UserId = userid,
                 Title = journalEntryRequest.Title,
                 Content = journalEntryRequest.Content,
                 Date = DateTime.Parse(journalEntryRequest.Date),
-                Summary = "hi" // call summary function and pass in content
+                Summary = journalSummary ?? "",
             };
 
             // Add a new journal entry if it doesn't already exist
@@ -183,5 +191,11 @@ public class JournalEntryController : ControllerBase
         }
 
         return NotFound("Failed to delete journal entry");
+    }
+
+    public async Task<string> GetJournalSummary(string content) {
+        var response = await _httpClient.PostAsync("http://url/Chat/summarize", new StringContent(content));
+        var summary = await response.Content.ReadAsStringAsync();
+        return summary;
     }
 }

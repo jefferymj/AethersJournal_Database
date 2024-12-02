@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Identity.Data;
 using MongoDB.Bson;
 using MongoDB.Driver;
+using BCrypt.Net;
 
 [ApiController]
 [Route("api/[controller]")]
@@ -21,25 +23,61 @@ public class UserController : ControllerBase
         {
             return BadRequest("All fields are required");
         }
-        
+
+        // Hash password
+        string hashedPassword = BCrypt.Net.BCrypt.HashPassword(user.Password);
         User userModel = new User
         {
             _id = ObjectId.GenerateNewId().ToString(),
             FirstName = user.FirstName,
             LastName = user.LastName,
             Email = user.Email,
-            Password = user.Password
+            Password = hashedPassword,
         };
         await _mongoDBService.Users.InsertOneAsync(userModel);
-        return Ok("User added successfully");
+        return Ok("Password hashed & User added successfully");
 
     }
 
+    // Login using email and password
+    [HttpPost("login")]
+    public async Task<IActionResult> Login([FromBody] LoginRequest loginRequest)
+    {
+        if (loginRequest == null || string.IsNullOrEmpty(loginRequest.Email) || string.IsNullOrEmpty(loginRequest.Password))
+        {
+            return BadRequest("Email and password are required");
+        }
+
+        var existingUser = await _mongoDBService.Users.Find(u => u.Email == loginRequest.Email).FirstOrDefaultAsync();
+        if (existingUser == null)
+        {
+            return NotFound("User not found");
+        }
+
+        // Compare hashed password
+        if (BCrypt.Net.BCrypt.Verify(loginRequest.Password, existingUser.Password))
+        {
+            return Ok("Login successful");
+        }
+        else
+        {
+            return BadRequest("Invalid password");
+        }
+    }
+
     // Get a user by userid
-    [HttpGet("getUser/{userid}")]
+    [HttpGet("getUserByID/{userid}")]
     public async Task<IActionResult> GetUser(string userid)
     {
         var user = await _mongoDBService.Users.Find(u => u._id == userid).FirstOrDefaultAsync();
+        return user != null ? Ok(user) : NotFound("User not found");
+    }
+
+    // Get a user by email
+    [HttpGet("getUserByEmail/{email}")]
+    public async Task<IActionResult> GetUserByEmail(string email)
+    {
+        var user = await _mongoDBService.Users.Find(u => u.Email == email).FirstOrDefaultAsync();
         return user != null ? Ok(user) : NotFound("User not found");
     }
 

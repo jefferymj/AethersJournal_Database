@@ -7,6 +7,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="bcrypt.net-next" Version="4.0.3" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.0.10" />
     <PackageReference Include="mongodb.driver" Version="3.0.0" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />

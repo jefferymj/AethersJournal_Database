@@ -1,3 +1,7 @@
+using System.Net.Http;
+using System.Text;
+using System.Text.Json;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using MongoDB.Driver;
 
@@ -52,12 +56,12 @@ public class JournalEntryController : ControllerBase
 
             if (!string.IsNullOrEmpty(journalEntryRequest.Content))
                 updateDefinition.Add(Builders<JournalEntry>.Update.Set(j => j.Content, journalEntryRequest.Content));
-            
-            string journalSummary = await GetJournalSummary(journalEntryRequest.Content);
 
-            if (!string.IsNullOrEmpty(journalSummary))
-                updateDefinition.Add(Builders<JournalEntry>.Update.Set(j => j.Summary, journalSummary));
-            
+            SummaryResponse journalSummary = await GetJournalSummary(journalEntryRequest.Content);
+
+            if (!string.IsNullOrEmpty(journalSummary.response))
+                updateDefinition.Add(Builders<JournalEntry>.Update.Set(j => j.Summary, journalSummary.response));
+
             var combinedUpdate = Builders<JournalEntry>.Update.Combine(updateDefinition);
 
             var updateResult = await _mongoDBService.JournalEntries.UpdateOneAsync(
@@ -69,7 +73,7 @@ public class JournalEntryController : ControllerBase
         }
         else
         {
-            string journalSummary = await GetJournalSummary(journalEntryRequest.Content);
+            var journalSummary = await GetJournalSummary(journalEntryRequest.Content);
 
             JournalEntry journalEntry = new JournalEntry
             {
@@ -77,7 +81,7 @@ public class JournalEntryController : ControllerBase
                 Title = journalEntryRequest.Title,
                 Content = journalEntryRequest.Content,
                 Date = DateTime.Parse(journalEntryRequest.Date),
-                Summary = journalSummary ?? "",
+                Summary = journalSummary.response ?? "",
             };
 
             // Add a new journal entry if it doesn't already exist
@@ -94,7 +98,7 @@ public class JournalEntryController : ControllerBase
     // Get journal entry by journalentryid
     [HttpGet("getJournalEntry/{userid}/{date}")]
     public async Task<IActionResult> GetJournalEntry(string userid, string date)
-    {   
+    {
         var user = _mongoDBService.Users.Find(u => u._id == userid).FirstOrDefault();
         if (user == null)
         {
@@ -105,7 +109,7 @@ public class JournalEntryController : ControllerBase
         var journalEntry = await _mongoDBService.JournalEntries
             .Find(j => j.UserId == userid && j.Date == DateTime.Parse(date))
             .FirstOrDefaultAsync();
-        
+
         if (journalEntry == null)
         {
             // Return a 200 Ok response if no matching journal entry is found
@@ -193,9 +197,18 @@ public class JournalEntryController : ControllerBase
         return NotFound("Failed to delete journal entry");
     }
 
-    public async Task<string> GetJournalSummary(string content) {
-        var response = await _httpClient.PostAsync("http://url/Chat/summarize", new StringContent(content));
-        var summary = await response.Content.ReadAsStringAsync();
-        return summary;
+    public async Task<SummaryResponse> GetJournalSummary(string content)
+    {
+        var jsonObject = new { Message = content };
+        var jsonContent = JsonSerializer.Serialize(jsonObject);
+        var httpContent = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+
+        var response = await _httpClient.PostAsync("https://aether-czdxepa8htg7eec5.canadacentral-01.azurewebsites.net/api/summary/send-summary", httpContent);
+        var responseContent = await response.Content.ReadAsStringAsync();
+
+        var summaryResponse = JsonSerializer.Deserialize<SummaryResponse>(responseContent);
+        return summaryResponse!;
     }
+
+
 }

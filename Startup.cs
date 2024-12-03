@@ -19,7 +19,7 @@ public class Startup
         {
             options.AddPolicy("AllowSpecificOrigin", builder =>
             {
-                builder.WithOrigins("https://aethersdb-634c4ba00e90.herokuapp.com") // Add allowed origins here
+                builder.WithOrigins("http://localhost:5015") // Add allowed origins here
                        .AllowAnyHeader()
                        .AllowAnyMethod()
                        .AllowCredentials();
@@ -55,7 +55,9 @@ public class Startup
 
         app.UseEndpoints(endpoints =>
         {
-            endpoints.MapControllers();
+            endpoints.MapControllerRoute(
+                name: "default",
+                pattern: "{controller=User}/{action=login}/{id?}");
         });
     }
 }

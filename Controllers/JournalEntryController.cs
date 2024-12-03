@@ -19,8 +19,8 @@ public class JournalEntryController : ControllerBase
     }
 
     // Create a new journal entry
-    [HttpPost("addJournalEntry/{userid}")]
-    public async Task<IActionResult> AddOrUpdateJournalEntry(string userid, [FromBody] JournalEntryRequest journalEntryRequest)
+    [HttpPost("addJournalEntry")]
+    public async Task<IActionResult> AddOrUpdateJournalEntry([FromBody] JournalEntryRequest journalEntryRequest)
     {
         // check if journal entry request fields are null
         if (string.IsNullOrEmpty(journalEntryRequest.Title) || string.IsNullOrEmpty(journalEntryRequest.Content) || string.IsNullOrEmpty(journalEntryRequest.Date))
@@ -28,96 +28,144 @@ public class JournalEntryController : ControllerBase
             return BadRequest("Title, Content, and Date are required fields.");
         }
 
-        // Check if the associated user exists
-        var existingUser = await _mongoDBService.Users.Find(u => u._id == userid).FirstOrDefaultAsync();
-
-
-        if (existingUser == null)
+        if (Request.Cookies.TryGetValue("sid", out string? sessionToken))
         {
-            // Return an error response if the associated user does not exist
-            return NotFound("User does not exist. Cannot add or update journal entry.");
-        }
+            Session session = await _mongoDBService.Session
+                            .Find(s => s.SessionToken == sessionToken)
+                            .FirstOrDefaultAsync();
 
-        var parsedDate = DateTime.ParseExact(journalEntryRequest.Date, "yyyy-MM-dd", null);
-        var nextDay = parsedDate.AddDays(1);
+            if (session == null) return Unauthorized();
 
-        // Check if a journal entry with the same ID already exists for this user
-        var existingJournalEntry = await _mongoDBService.JournalEntries
-            .Find(j => j.UserId == userid && j.Date >= parsedDate && j.Date < nextDay)
-            .FirstOrDefaultAsync();
+            string userId = session.UserId;
 
-        if (existingJournalEntry != null)
-        {
-            // Partial update for an existing journal entry
-            var updateDefinition = new List<UpdateDefinition<JournalEntry>>();
+            // Check if the associated user exists
+            var existingUser = await _mongoDBService.Users.Find(u => u._id == userId).FirstOrDefaultAsync();
 
-            if (!string.IsNullOrEmpty(journalEntryRequest.Title))
-                updateDefinition.Add(Builders<JournalEntry>.Update.Set(j => j.Title, journalEntryRequest.Title));
-
-            if (!string.IsNullOrEmpty(journalEntryRequest.Content))
-                updateDefinition.Add(Builders<JournalEntry>.Update.Set(j => j.Content, journalEntryRequest.Content));
-
-            SummaryResponse journalSummary = await GetJournalSummary(journalEntryRequest.Content);
-
-            if (!string.IsNullOrEmpty(journalSummary.response))
-                updateDefinition.Add(Builders<JournalEntry>.Update.Set(j => j.Summary, journalSummary.response));
-
-            var combinedUpdate = Builders<JournalEntry>.Update.Combine(updateDefinition);
-
-            var updateResult = await _mongoDBService.JournalEntries.UpdateOneAsync(
-                j => j.UserId == userid && j.Date == DateTime.Parse(journalEntryRequest.Date),
-                combinedUpdate
-            );
-
-            return updateResult.ModifiedCount > 0 ? Ok("Journal entry updated successfully") : NotFound("Failed to update journal entry");
-        }
-        else
-        {
-            var journalSummary = await GetJournalSummary(journalEntryRequest.Content);
-
-            JournalEntry journalEntry = new JournalEntry
+            if (existingUser == null)
             {
-                UserId = userid,
-                Title = journalEntryRequest.Title,
-                Content = journalEntryRequest.Content,
-                Date = DateTime.Parse(journalEntryRequest.Date),
-                Summary = journalSummary.response ?? "",
-            };
+                // Return an error response if the associated user does not exist
+                return NotFound("User does not exist. Cannot add or update journal entry.");
+            }
 
-            // Add a new journal entry if it doesn't already exist
-            await _mongoDBService.JournalEntries.InsertOneAsync(journalEntry);
+            var parsedDate = DateTime.ParseExact(journalEntryRequest.Date, "yyyy-MM-dd", null);
+            var nextDay = parsedDate.AddDays(1);
 
-            // Update the user's document to add the new journalEntryId
-            var addToUserJournalEntries = Builders<User>.Update.AddToSet(u => u.JournalEntries, journalEntry.Id);
-            await _mongoDBService.Users.UpdateOneAsync(u => u._id == userid, addToUserJournalEntries);
+            // Check if a journal entry with the same ID already exists for this user
+            JournalEntry existingJournalEntry = await _mongoDBService.JournalEntries
+                .Find(j => j.UserId == userId && j.Date >= parsedDate && j.Date < nextDay)
+                .FirstOrDefaultAsync();
 
-            return Ok("Journal entry added successfully");
+            if (existingJournalEntry != null)
+            {
+                // Partial update for an existing journal entry
+                var updateDefinition = new List<UpdateDefinition<JournalEntry>>();
+
+                Chat chatExists = await _mongoDBService.Chat
+                    .Find(c => c.JournalId == existingJournalEntry.Id)
+                    .FirstOrDefaultAsync();
+
+                if (chatExists == null)
+                {
+                    Chat chat = new()
+                    {
+                        JournalId = existingJournalEntry.Id,
+                    };
+
+                    Console.WriteLine(chat);
+
+                    await _mongoDBService.Chat.InsertOneAsync(chat);
+                    updateDefinition.Add(Builders<JournalEntry>.Update.Set(j => j.ChatId, chat.ChatId));
+                }
+
+                if (!string.IsNullOrEmpty(journalEntryRequest.Title))
+                    updateDefinition.Add(Builders<JournalEntry>.Update.Set(j => j.Title, journalEntryRequest.Title));
+
+                if (!string.IsNullOrEmpty(journalEntryRequest.Content))
+                    updateDefinition.Add(Builders<JournalEntry>.Update.Set(j => j.Content, journalEntryRequest.Content));
+
+                SummaryResponse journalSummary = await GetJournalSummary(journalEntryRequest.Content);
+
+                var combinedUpdate = Builders<JournalEntry>.Update.Combine(updateDefinition);
+
+                var updateResult = await _mongoDBService.JournalEntries.UpdateOneAsync(
+                    j => j.UserId == userId && j.Date == DateTime.Parse(journalEntryRequest.Date),
+                    combinedUpdate
+                );
+
+                return updateResult.ModifiedCount > 0 ? Ok(new {journalId = existingJournalEntry.Id}) : NotFound("Failed to update journal entry");
+            }
+            else
+            {
+                var journalSummary = await GetJournalSummary(journalEntryRequest.Content);
+
+                JournalEntry journalEntry = new JournalEntry
+                {
+                    UserId = userId,
+                    Title = journalEntryRequest.Title,
+                    Content = journalEntryRequest.Content,
+                    Date = DateTime.Parse(journalEntryRequest.Date),
+                    Summary = journalSummary.response ?? ""
+                };
+
+
+                Chat chat = new()
+                {
+                    JournalId = journalEntry.Id,
+                };
+
+                await _mongoDBService.Chat.InsertOneAsync(chat);
+
+                journalEntry.ChatId = chat._id;
+
+                await _mongoDBService.JournalEntries.InsertOneAsync(journalEntry);
+
+                var addJournalIdToChat = Builders<Chat>.Update.Set(c => c.JournalId, journalEntry.Id);
+                await _mongoDBService.Chat.UpdateOneAsync(c => c._id == chat._id, addJournalIdToChat);
+
+                var addToUserJournalEntries = Builders<User>.Update.AddToSet(u => u.JournalEntries, journalEntry.Id);
+                await _mongoDBService.Users.UpdateOneAsync(u => u._id == userId, addToUserJournalEntries);
+
+                return Ok(new {journalId = journalEntry.Id});
+            }
         }
+        return Unauthorized();
     }
 
     // Get journal entry by journalentryid
-    [HttpGet("getJournalEntry/{userid}/{date}")]
-    public async Task<IActionResult> GetJournalEntry(string userid, string date)
+    [HttpGet("getJournalEntry/{date}")]
+    public async Task<IActionResult> GetJournalEntry(string date)
     {
-        var user = _mongoDBService.Users.Find(u => u._id == userid).FirstOrDefault();
-        if (user == null)
+        if (Request.Cookies.TryGetValue("sid", out string? sessionToken))
         {
-            return NotFound("User not found");
+            Session session = await _mongoDBService.Session
+                            .Find(s => s.SessionToken == sessionToken)
+                            .FirstOrDefaultAsync();
+
+            if (session == null) return Unauthorized();
+
+            string userId = session.UserId;
+
+            var user = _mongoDBService.Users.Find(u => u._id == userId).FirstOrDefault();
+            if (user == null)
+            {
+                return NotFound("User not found");
+            }
+
+            // Retrieve the journal entry that matches the specified userid and journalentryid
+            var journalEntry = await _mongoDBService.JournalEntries
+                .Find(j => j.UserId == userId && j.Date == DateTime.Parse(date))
+                .FirstOrDefaultAsync();
+
+            if (journalEntry == null)
+            {
+                // Return a 200 Ok response if no matching journal entry is found
+                return Ok("There is no journal entry for that date.");
+            }
+
+            // Return the journal entry data as a JSON object
+            return Ok(journalEntry);
         }
-
-        // Retrieve the journal entry that matches the specified userid and journalentryid
-        var journalEntry = await _mongoDBService.JournalEntries
-            .Find(j => j.UserId == userid && j.Date == DateTime.Parse(date))
-            .FirstOrDefaultAsync();
-
-        if (journalEntry == null)
-        {
-            // Return a 200 Ok response if no matching journal entry is found
-            return Ok("There is no journal entry for that date.");
-        }
-
-        // Return the journal entry data as a JSON object
-        return Ok(journalEntry);
+        return Unauthorized();
     }
 
     // Update journal entry by journalentryid
@@ -209,6 +257,4 @@ public class JournalEntryController : ControllerBase
         var summaryResponse = JsonSerializer.Deserialize<SummaryResponse>(responseContent);
         return summaryResponse!;
     }
-
-
 }

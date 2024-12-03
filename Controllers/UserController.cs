@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Identity.Data;
 using MongoDB.Bson;
 using MongoDB.Driver;
+using System.Security.Cryptography;
 using BCrypt.Net;
 
 [ApiController]
@@ -57,12 +58,25 @@ public class UserController : ControllerBase
         // Compare hashed password
         if (BCrypt.Net.BCrypt.Verify(loginRequest.Password, existingUser.Password))
         {
+            string sessionToken = await CreateOrUpdateSessionToken(existingUser.UserId!);
+            Console.WriteLine(sessionToken);
+            Console.WriteLine("Yoooooo");
+
+            var cookieOptions = new CookieOptions
+            {
+                Expires = DateTime.UtcNow.AddDays(1),
+                HttpOnly = true,
+                Secure = true,
+                SameSite = SameSiteMode.None
+            };
+
+            Response.Cookies.Append("sid", sessionToken, cookieOptions);
             return Ok("Login successful");
         }
         else
         {
             return BadRequest("Invalid password");
-        }
+        }        
     }
 
     // Get a user by userid
@@ -141,4 +155,43 @@ public class UserController : ControllerBase
         }
     }
 
+
+    private async Task<string> CreateOrUpdateSessionToken(string userId)
+    {
+        string sessionToken = GenerateSecureToken(32);
+
+        var filter = Builders<Session>.Filter.Eq(s => s.UserId, userId);
+        var update = Builders<Session>.Update.Set(s => s.SessionToken, sessionToken);
+
+        var sessionExists = await _mongoDBService.Session.Find(filter).FirstOrDefaultAsync();
+
+        if (sessionExists != null)
+        {
+            var updateResult = await _mongoDBService.Session.UpdateOneAsync(filter, update);
+
+            if (updateResult.ModifiedCount <= 0)
+            {
+                throw new Exception("Failed to update session token");
+            }
+        }
+        else
+        {
+            Session session = new Session
+            {
+                SessionToken = sessionToken,
+                UserId = userId,
+            };
+
+            await _mongoDBService.Session.InsertOneAsync(session);
+        }
+
+        return sessionToken;
+    }
+
+    public static string GenerateSecureToken(int length)
+    {
+        var byteArray = new byte[length];
+        RandomNumberGenerator.Fill(byteArray);
+        return Convert.ToBase64String(byteArray);
+    }
 }

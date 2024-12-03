@@ -5,13 +5,26 @@ public class Chat
 {
     [BsonId]
     [BsonRepresentation(BsonType.ObjectId)]
-    public required string Id { get; set; }
+    public string? _id
+    {
+        get => _backingId;
+        set
+        {
+            _backingId = value;
+            ChatId = value;
+        }
+    }
+
+    private string? _backingId;
 
     [BsonElement("chatid")]
-    public required string ChatId { get; set; }
+    public string? ChatId { get; set; }
+
+    [BsonElement("journal_id")]
+    public string? JournalId { get; set; }
 
     [BsonElement("messages")]
-    public required List<Message> Messages { get; set; }
+    public List<Message> Messages { get; set; } = [];
 }
 
 public class Message
@@ -20,7 +33,6 @@ public class Message
     public DateTime Time { get; set; } = DateTime.Now;
 
     [BsonElement("sender")]
-    [BsonRepresentation(BsonType.ObjectId)]
     public required string Sender { get; set; }
 
     [BsonElement("message")]

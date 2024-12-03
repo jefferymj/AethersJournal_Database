@@ -15,4 +15,5 @@ public class MongoDBService
     public IMongoCollection<UserStatus> UserStatus => _database.GetCollection<UserStatus>("userStatus");
     public IMongoCollection<JournalEntry> JournalEntries => _database.GetCollection<JournalEntry>("journalEntries");
     public IMongoCollection<Chat> Chat => _database.GetCollection<Chat>("chat");
+    public IMongoCollection<Session> Session => _database.GetCollection<Session>("session");
 }

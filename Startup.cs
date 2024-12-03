@@ -19,7 +19,7 @@ public class Startup
         {
             options.AddPolicy("AllowSpecificOrigin", builder =>
             {
-                builder.WithOrigins("https://aethersjournaldb.azurewebsites.net") // Add allowed origins here
+                builder.WithOrigins("http://localhost:5015") // Add allowed origins here
                        .AllowAnyHeader()
                        .AllowAnyMethod()
                        .AllowCredentials();

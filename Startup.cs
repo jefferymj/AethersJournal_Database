@@ -17,9 +17,9 @@ public class Startup
         // Add CORS policy
         services.AddCors(options =>
         {
-            options.AddPolicy("http://localhost:5015", builder =>
+            options.AddPolicy("AllowSpecificOrigin", builder =>
             {
-                builder.WithOrigins("http://localhost:5015") // Add allowed origins here
+                builder.WithOrigins("https://aethersjournaldb.azurewebsites.net") // Add allowed origins here
                        .AllowAnyHeader()
                        .AllowAnyMethod()
                        .AllowCredentials();
@@ -49,7 +49,7 @@ public class Startup
         app.UseRouting();
 
         // Enable CORS
-        app.UseCors("http://localhost:5015");
+        app.UseCors("AllowSpecificOrigin");
 
         app.UseAuthorization();
 
@@ -57,7 +57,7 @@ public class Startup
         {
             endpoints.MapControllerRoute(
                 name: "default",
-                pattern: "{controller=Home}/{action=Index}/{id?}");
+                pattern: "{controller=User}/{action=login}/{id?}");
         });
     }
 }
